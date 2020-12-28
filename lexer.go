@@ -15,27 +15,31 @@ var special = map[string]bool{
 	"(": true,
 	")": true,
 	";": true,
+	"-": true,
+	"!": true,
+	"~": true,
 }
 
 type Lexer interface {
 	NextToken() string
+	Token() string
 }
 
 type PlainLexer struct {
-	file *os.File
+	file  *os.File
+	token string
 }
 
-func NewPlainLexer(filename string) PlainLexer {
+func NewPlainLexer(filename string) (l *PlainLexer, cleanup func()) {
 	f, err := os.Open(filename)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return PlainLexer{
-		file: f,
-	}
+	l = &PlainLexer{file: f}
+	return l, func() { f.Close() }
 }
 
-func (l PlainLexer) NextToken() string {
+func (l *PlainLexer) NextToken() string {
 	var token strings.Builder
 	var err error
 	b := make([]byte, 1)
@@ -43,23 +47,31 @@ func (l PlainLexer) NextToken() string {
 		_, err = l.file.Read(b)
 		if b[0] == ' ' || b[0] == '\n' || b[0] == '\t' || b[0] == '\r' {
 			if token.Len() > 0 {
-				return token.String()
+				l.token = token.String()
+				return l.token
 			}
 		} else if special[string(b)] {
 			if token.Len() > 0 {
 				l.file.Seek(-1, 1)
-				return token.String()
+				l.token = token.String()
+				return l.token
 			} else {
-				return string(b)
+				l.token = string(b)
+				return l.token
 			}
 		} else {
 			token.WriteByte(b[0])
 		}
 	}
-	defer l.file.Close()
+	l.token = ""
 	return ""
 }
 
+func (l *PlainLexer) Token() string {
+	return l.token
+}
+
+// Buffered version
 type BufLexer struct {
 	file   *os.File
 	bufRdr *bufio.Reader

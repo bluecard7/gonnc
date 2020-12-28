@@ -1,18 +1,17 @@
 package main
 
 import (
+	"log"
 	"os"
 )
 
 func main() {
-	lexer := NewPlainLexer(os.Args[1])
-	/*
-		l := NewBufLexer(os.Args[1])
-		for token := l.NextToken(); token != ""; token = l.NextToken() {
-			fmt.Println(token)
-		}
-	*/
-	prog := AST(lexer)
+	lexer, lexerCleanup := NewPlainLexer(os.Args[1])
+	defer lexerCleanup()
+	program, err := AST(lexer)
+	if err != nil {
+		log.Fatal(err)
+	}
 	//prog.PrintAST(0)
-	ASTToASM(prog)
+	ASTToASM(program)
 }

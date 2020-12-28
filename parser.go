@@ -35,37 +35,46 @@ func (node *ASTNode) AddChild(child *ASTNode) {
 	node.children = append(node.children, child)
 }
 
-func AST(lexer Lexer) *ASTNode {
+func tokenErr(want, got string) error {
+	return fmt.Errorf("Expected %s, got %s", want, got)
+}
+
+func AST(lexer Lexer) (*ASTNode, error) {
 	program := NewASTNode("Program")
-	for token := lexer.NextToken(); token != ""; token = lexer.NextToken() {
-		if token == "int" {
+	for lexer.NextToken() != "" {
+		if lexer.Token() == "int" {
 			funcNode := NewASTNode("Function")
 			funcNode.Put("Name", lexer.NextToken())
-			// parens, func params
-			lexer.NextToken()
-			lexer.NextToken()
-			// {
-			lexer.NextToken()
-			for token != "}" {
+			// (...params)
+			if lexer.NextToken() != "(" {
+				return program, tokenErr("(", lexer.Token())
+			}
+			if lexer.NextToken() != ")" {
+				return program, tokenErr(")", lexer.Token())
+			}
+			// func definition
+			if lexer.NextToken() != "{" {
+				return program, tokenErr("{", lexer.Token())
+			}
+			for lexer.NextToken() != "}" {
 				stmtNode := NewASTNode("Stmt")
-				switch lexer.NextToken() {
+				switch lexer.Token() {
 				case "return":
 					stmtNode.Put("StmtType", "Return")
-					// would refer to another Node if not a literal value
+					// TODO:: recursively descend if not a literal value
 					stmtNode.Put("Value", lexer.NextToken())
-					lexer.NextToken()
-				case "}":
-					token = "}"
+					if lexer.NextToken() != ";" {
+						return program, tokenErr(";", lexer.Token())
+					}
 				}
-				if token != "}" {
-					funcNode.AddChild(stmtNode)
-				}
+				funcNode.AddChild(stmtNode)
 			}
 			program.AddChild(funcNode)
+		} else {
+			return program, fmt.Errorf("Unidentified token: %s", lexer.Token())
 		}
-
 	}
-	return program
+	return program, nil
 }
 
 func (node *ASTNode) PrintAST(lvl int) {
