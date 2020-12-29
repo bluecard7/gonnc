@@ -2,49 +2,41 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"strconv"
 )
 
-type ASTNode struct {
-	data     map[string]string
-	children []*ASTNode
-}
+const (
+	PROGRAM = iota
+	FUNCTION
+	RETURN
+	NUM
 
-func NewASTNode(nodeType string) *ASTNode {
-	node := &ASTNode{
-		data:     make(map[string]string),
-		children: []*ASTNode{},
-	}
-	node.Put("Type", nodeType)
-	return node
-}
+	NEG
+	NOT
+	COMPLEMENT
 
-func (node *ASTNode) Put(key, val string) {
-	node.data[key] = val
-}
-
-func (node *ASTNode) Get(key string) string {
-	val, ok := node.data[key]
-	if !ok {
-		return ""
-	}
-	return val
-}
-
-func (node *ASTNode) AddChild(child *ASTNode) {
-	node.children = append(node.children, child)
-}
+	ADD
+	SUB
+	MUL
+	DIV
+)
 
 func tokenErr(want, got string) error {
 	return fmt.Errorf("Expected %s, got %s", want, got)
 }
 
+func unknownToken(got string) error {
+	return fmt.Errorf("Unknown token: %s", got)
+}
+
 func AST(lexer Lexer) (*ASTNode, error) {
-	program := NewASTNode("Program")
+	program := NewASTNode(PROGRAM)
 	for lexer.NextToken() != "" {
 		if lexer.Token() == "int" {
-			funcNode := NewASTNode("Function")
-			funcNode.Put("Name", lexer.NextToken())
+			funcNode := NewASTNode(FUNCTION)
+			// IDEA: Map function names to their ASTNodes
+			//funcNode.Put("Name", lexer.NextToken())
+			lexer.NextToken()
 			// (...params)
 			if lexer.NextToken() != "(" {
 				return program, tokenErr("(", lexer.Token())
@@ -57,32 +49,95 @@ func AST(lexer Lexer) (*ASTNode, error) {
 				return program, tokenErr("{", lexer.Token())
 			}
 			for lexer.NextToken() != "}" {
-				stmtNode := NewASTNode("Stmt")
+				var stmtNode *ASTNode
 				switch lexer.Token() {
 				case "return":
-					stmtNode.Put("StmtType", "Return")
-					// TODO:: recursively descend if not a literal value
-					stmtNode.Put("Value", lexer.NextToken())
+					stmtNode = NewASTNode(RETURN)
+					expr, err := expression(lexer)
+					if err != nil {
+						return program, err
+					}
+					stmtNode.AddChildren(expr)
 					if lexer.NextToken() != ";" {
 						return program, tokenErr(";", lexer.Token())
 					}
+				default:
+					return program, unknownToken(lexer.Token())
 				}
-				funcNode.AddChild(stmtNode)
+				funcNode.AddChildren(stmtNode)
 			}
-			program.AddChild(funcNode)
+			program.AddChildren(funcNode)
 		} else {
-			return program, fmt.Errorf("Unidentified token: %s", lexer.Token())
+			return program, unknownToken(lexer.Token())
 		}
 	}
 	return program, nil
 }
 
-func (node *ASTNode) PrintAST(lvl int) {
-	for k, v := range node.data {
-		fmt.Println(strings.Repeat("\t", lvl), k, ":", v)
-	}
+func expression(lexer Lexer) (expr *ASTNode, err error) {
+	// Placeholder for top level expression parsing
+	expr, err = additive(lexer)
+	return expr, err
+}
 
-	for _, child := range node.children {
-		child.PrintAST(lvl + 1)
+func additive(lexer Lexer) (add *ASTNode, err error) {
+	mul1, err := multiplicative(lexer)
+	if err != nil {
+		return mul1, err
 	}
+	switch lexer.NextToken() {
+	case "+":
+		add = NewASTNode(ADD)
+	case "-":
+		add = NewASTNode(SUB)
+	default:
+		lexer.Rewind()
+		return mul1, nil
+	}
+	mul2, err := multiplicative(lexer)
+	if err != nil {
+		return mul2, err
+	}
+	add.AddChildren(mul1, mul2)
+	return add, err
+}
+
+func multiplicative(lexer Lexer) (mul *ASTNode, err error) {
+	prim1, err := primary(lexer)
+	if err != nil {
+		return prim1, err
+	}
+	switch lexer.NextToken() {
+	case "*":
+		mul = NewASTNode(MUL)
+	case "/":
+		mul = NewASTNode(DIV)
+	default:
+		lexer.Rewind()
+		return prim1, nil
+	}
+	prim2, err := primary(lexer)
+	if err != nil {
+		return prim2, err
+	}
+	mul.AddChildren(prim1, prim2)
+	return mul, err
+}
+
+func primary(lexer Lexer) (prim *ASTNode, err error) {
+	switch lexer.NextToken() {
+	case "(":
+		prim, err = expression(lexer)
+		if lexer.NextToken() != ")" {
+			return prim, tokenErr(")", lexer.Token())
+		}
+	default:
+		prim = NewASTNode(NUM)
+		v, err := strconv.ParseInt(lexer.Token(), 10, 64)
+		if err != nil {
+			return prim, err
+		}
+		prim.Value = NodeValue(v)
+	}
+	return prim, err
 }

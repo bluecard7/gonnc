@@ -15,19 +15,24 @@ var special = map[string]bool{
 	"(": true,
 	")": true,
 	";": true,
+
+	"+": true,
 	"-": true,
+	"*": true,
+	"/": true,
 	"!": true,
 	"~": true,
 }
 
 type Lexer interface {
 	NextToken() string
+	Rewind()
 	Token() string
 }
 
 type PlainLexer struct {
-	file  *os.File
-	token string
+	file         *os.File
+	token, cache string
 }
 
 func NewPlainLexer(filename string) (l *PlainLexer, cleanup func()) {
@@ -39,7 +44,16 @@ func NewPlainLexer(filename string) (l *PlainLexer, cleanup func()) {
 	return l, func() { f.Close() }
 }
 
+func (l *PlainLexer) Rewind() {
+	l.cache = l.token
+}
+
 func (l *PlainLexer) NextToken() string {
+	if len(l.cache) > 0 {
+		defer func() { l.cache = "" }()
+		return l.cache
+	}
+
 	var token strings.Builder
 	var err error
 	b := make([]byte, 1)

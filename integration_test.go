@@ -1,10 +1,14 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"testing"
 )
+
+var printAST = flag.Bool("ast", false, "prints AST of program")
 
 // Using tests from https://github.com/nlsandler/write_a_c_compiler
 func TestCompiler(t *testing.T) {
@@ -31,6 +35,7 @@ func testOutput(t *testing.T, dir, label string) {
 	for _, file := range files {
 		filepath := path + file.Name()
 		t.Run(label+file.Name(), func(t *testing.T) {
+			fmt.Println("[COMPILING]:", filepath)
 			lexer, lexerCleanup := NewPlainLexer(filepath)
 			defer lexerCleanup()
 			program, err := AST(lexer)
@@ -38,7 +43,9 @@ func testOutput(t *testing.T, dir, label string) {
 				log.Println(err)
 				return
 			}
-			program.PrintAST(0)
+			if *printAST {
+				program.PrintAST(0)
+			}
 			ASTToASM(program)
 		})
 	}
