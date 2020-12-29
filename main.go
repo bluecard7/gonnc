@@ -33,5 +33,5 @@ func main() {
 	if *upToParse {
 		return
 	}
-	ASTToASM(program)
+	Compile(program)
 }
