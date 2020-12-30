@@ -80,47 +80,51 @@ func expression(lexer Lexer) (expr *ASTNode, err error) {
 	return expr, err
 }
 
-func additive(lexer Lexer) (add *ASTNode, err error) {
-	mul1, err := multiplicative(lexer)
-	if err != nil {
-		return mul1, err
+func additive(lexer Lexer) (*ASTNode, error) {
+	add, err := multiplicative(lexer)
+	for err == nil {
+		var kind NodeKind
+		switch lexer.NextToken() {
+		case "+":
+			kind = ADD
+		case "-":
+			kind = SUB
+		default:
+			lexer.Rewind()
+			return add, err
+		}
+		mul, err := multiplicative(lexer)
+		if err != nil {
+			return mul, err
+		}
+		nextAdd := NewASTNode(kind)
+		nextAdd.AddChildren(add, mul)
+		add = nextAdd
 	}
-	switch lexer.NextToken() {
-	case "+":
-		add = NewASTNode(ADD)
-	case "-":
-		add = NewASTNode(SUB)
-	default:
-		lexer.Rewind()
-		return mul1, nil
-	}
-	mul2, err := multiplicative(lexer)
-	if err != nil {
-		return mul2, err
-	}
-	add.AddChildren(mul1, mul2)
 	return add, err
 }
 
-func multiplicative(lexer Lexer) (mul *ASTNode, err error) {
-	prim1, err := primary(lexer)
-	if err != nil {
-		return prim1, err
+func multiplicative(lexer Lexer) (*ASTNode, error) {
+	mul, err := primary(lexer)
+	for err == nil {
+		var kind NodeKind
+		switch lexer.NextToken() {
+		case "*":
+			kind = MUL
+		case "/":
+			kind = DIV
+		default:
+			lexer.Rewind()
+			return mul, err
+		}
+		prim, err := primary(lexer)
+		if err != nil {
+			return prim, err
+		}
+		nextMul := NewASTNode(kind)
+		nextMul.AddChildren(mul, prim)
+		mul = nextMul
 	}
-	switch lexer.NextToken() {
-	case "*":
-		mul = NewASTNode(MUL)
-	case "/":
-		mul = NewASTNode(DIV)
-	default:
-		lexer.Rewind()
-		return prim1, nil
-	}
-	prim2, err := primary(lexer)
-	if err != nil {
-		return prim2, err
-	}
-	mul.AddChildren(prim1, prim2)
 	return mul, err
 }
 
