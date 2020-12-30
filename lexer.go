@@ -5,22 +5,22 @@ import (
 	"io"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"unicode"
 )
 
-var special = map[string]bool{
-	"{": true,
-	"}": true,
-	"(": true,
-	")": true,
-	";": true,
-	"+": true,
-	"-": true,
-	"*": true,
-	"/": true,
-	"!": true,
-	"~": true,
+type specialtokens []string
+
+func punctuators() specialtokens {
+	var tokens = []string{"{", "}", "(", ")", ";", "+", "-", "*", "/", "!", "~"}
+	sort.Strings(tokens)
+	return tokens
+}
+
+func (s specialtokens) has(target string) bool {
+	i := sort.SearchStrings(s, target)
+	return i < len(s) && s[i] == target
 }
 
 type Lexer interface {
@@ -31,6 +31,7 @@ type Lexer interface {
 
 type BufLexer struct {
 	bufRdr       *bufio.Reader
+	punctuators  specialtokens
 	token, cache string
 }
 
@@ -45,7 +46,10 @@ func NewBufLexer(filename string) (l *BufLexer, cleanup func()) {
 		}
 		cleanup = func() { f.Close() }
 	}
-	l = &BufLexer{bufRdr: bufio.NewReader(f)}
+	l = &BufLexer{
+		bufRdr:      bufio.NewReader(f),
+		punctuators: punctuators(),
+	}
 	return l, cleanup
 }
 
@@ -77,7 +81,7 @@ func (l *BufLexer) NextToken() string {
 				l.token = token.String()
 				return l.token
 			}
-		} else if special[string(r)] {
+		} else if l.punctuators.has(string(r)) {
 			l.token = string(r)
 			if token.Len() > 0 {
 				l.bufRdr.UnreadRune()
