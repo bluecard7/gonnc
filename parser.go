@@ -105,7 +105,7 @@ func additive(lexer Lexer) (*ASTNode, error) {
 }
 
 func multiplicative(lexer Lexer) (*ASTNode, error) {
-	mul, err := primary(lexer)
+	mul, err := unary(lexer)
 	for err == nil {
 		var kind NodeKind
 		switch lexer.NextToken() {
@@ -117,7 +117,7 @@ func multiplicative(lexer Lexer) (*ASTNode, error) {
 			lexer.Rewind()
 			return mul, err
 		}
-		prim, err := primary(lexer)
+		prim, err := unary(lexer)
 		if err != nil {
 			return prim, err
 		}
@@ -126,6 +126,24 @@ func multiplicative(lexer Lexer) (*ASTNode, error) {
 		mul = nextMul
 	}
 	return mul, err
+}
+
+func unary(lexer Lexer) (u *ASTNode, err error) {
+	switch lexer.NextToken() {
+	case "+":
+		u, err = unary(lexer)
+	case "-":
+		operand, err := unary(lexer)
+		if err != nil {
+			return operand, err
+		}
+		u = NewASTNode(NEG)
+		u.AddChildren(operand)
+	default:
+		lexer.Rewind()
+		u, err = primary(lexer)
+	}
+	return u, err
 }
 
 func primary(lexer Lexer) (prim *ASTNode, err error) {

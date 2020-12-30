@@ -43,6 +43,9 @@ func translateKind(kind NodeKind) string {
 		return "Mul"
 	case DIV:
 		return "Div"
+	case NEG:
+		return "Negation"
+
 	}
 	return fmt.Sprintf("Unknown Kind(%d)", kind)
 }

@@ -37,6 +37,9 @@ func astToAsm(node *ASTNode) {
 	case SUB:
 		setupBinOp(node)
 		fmt.Println("\tsub %rdi, %rax")
+	case NEG:
+		astToAsm(node.Children[0])
+		fmt.Println("\tneg %rax")
 	}
 }
 
