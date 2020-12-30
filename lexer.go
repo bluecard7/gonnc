@@ -30,79 +30,39 @@ type Lexer interface {
 	Token() string
 }
 
-type PlainLexer struct {
-	file         *os.File
+type BufLexer struct {
+	bufRdr       *bufio.Reader
 	token, cache string
 }
 
-func NewPlainLexer(filename string) (l *PlainLexer, cleanup func()) {
-	f, err := os.Open(filename)
-	if err != nil {
-		log.Fatal(err)
+func NewBufLexer(filename string) (l *BufLexer, cleanup func()) {
+	f := os.Stdin
+	cleanup = func() {}
+	if filename != "stdin" {
+		var err error
+		f, err = os.Open(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		cleanup = func() { f.Close() }
 	}
-	l = &PlainLexer{file: f}
-	return l, func() { f.Close() }
+	l = &BufLexer{bufRdr: bufio.NewReader(f)}
+	return l, cleanup
 }
 
-func (l *PlainLexer) Rewind() {
+func (l *BufLexer) Token() string {
+	return l.token
+}
+
+func (l *BufLexer) Rewind() {
 	l.cache = l.token
 }
 
-func (l *PlainLexer) NextToken() string {
+func (l *BufLexer) NextToken() string {
 	if len(l.cache) > 0 {
 		defer func() { l.cache = "" }()
 		return l.cache
 	}
-
-	var token strings.Builder
-	var err error
-	b := make([]byte, 1)
-	for err == nil {
-		_, err = l.file.Read(b)
-		if b[0] == ' ' || b[0] == '\n' || b[0] == '\t' || b[0] == '\r' {
-			if token.Len() > 0 {
-				l.token = token.String()
-				return l.token
-			}
-		} else if special[string(b)] {
-			if token.Len() > 0 {
-				l.file.Seek(-1, 1)
-				l.token = token.String()
-				return l.token
-			} else {
-				l.token = string(b)
-				return l.token
-			}
-		} else {
-			token.WriteByte(b[0])
-		}
-	}
-	l.token = ""
-	return ""
-}
-
-func (l *PlainLexer) Token() string {
-	return l.token
-}
-
-// Buffered version
-type BufLexer struct {
-	file   *os.File
-	bufRdr *bufio.Reader
-}
-
-func NewBufLexer(filename string) BufLexer {
-	f, err := os.Open(filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return BufLexer{
-		file:   f,
-		bufRdr: bufio.NewReader(f),
-	}
-}
-
-func (l BufLexer) NextToken() string {
 	var (
 		token strings.Builder
 		r     rune
@@ -110,23 +70,28 @@ func (l BufLexer) NextToken() string {
 	)
 	for err == nil {
 		r, _, err = l.bufRdr.ReadRune()
+		if err != nil {
+			break
+		}
 		if unicode.IsSpace(r) {
 			if token.Len() > 0 {
-				return token.String()
+				l.token = token.String()
+				return l.token
 			}
 		} else if special[string(r)] {
+			l.token = string(r)
 			if token.Len() > 0 {
 				l.bufRdr.UnreadRune()
-				return token.String()
+				l.token = token.String()
 			}
-			return string(r)
+			return l.token
 		} else {
 			token.WriteRune(r) // check for errors?
 		}
 	}
-	defer l.file.Close()
 	if err != io.EOF {
 		log.Fatal(err)
 	}
+	l.token = ""
 	return ""
 }
