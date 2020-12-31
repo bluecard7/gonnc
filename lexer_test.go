@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -19,18 +22,20 @@ func TestRewind(t *testing.T) {
 	lexer, cleanup := NewLexer("stdin")
 	defer cleanup()
 
-	got := make([]string, 0, 4)
+	var got []string
 	want := []string{"1", "2", "3", "3"}
+	// doesn't look like os.Stdin can be written to and read in this manner
 	fmt.Fprintf(os.Stdin, "1 2 3")
+
 	for i := 0; i < 2; i++ {
-		lexer.NextToken()
+		got = append(got, lexer.NextToken())
 	}
 	lexer.Rewind()
 	for lexer.Token() != "" {
-		lexer.NextToken()
+		got = append(got, lexer.NextToken())
 	}
 	if len(got) != len(want) {
-		t.Errorf("lengths don't match")
+		t.Fatalf("Expected %v, got %v", want, got)
 	}
 	for i := range want {
 		if want[i] != got[i] {
@@ -39,29 +44,49 @@ func TestRewind(t *testing.T) {
 	}
 }
 
+var update = flag.Bool("u", false, "update goldenfiles")
+
 func TestNextToken(t *testing.T) {
-	tests := []struct {
-		Program    string
-		GoldenFile string
-	}{
-		{Program: "0", GoldenFile: "return_0"},
-		{Program: "5/9*3+3+2*4*4", GoldenFile: ""},
-		// spaced out, etc, probably should bring in the tests folder
+	goldenFilePath := func(dir, filename string) string {
+		return dir + "golden/" + strings.Replace(filename, ".c", ".lex", 1)
 	}
-	for _, test := range tests {
-		fmt.Fprintf(os.Stdin, "int main() {%s;}", test.Program)
-		tokens := bytes.NewBuffer([]byte{})
-		for lexer.NextToken() != "" {
-			_, err := got.WriteString(lexer.Token())
-			if err != nil {
-				t.Fatal(err)
+
+	runTests := func(dir string) {
+		files, err := ioutil.ReadDir(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, file := range files {
+			if file.IsDir() {
+				continue
 			}
-		}
-		// if updating, write got to test.GoldenFile
-		want := ioutil.ReadFile(test.GoldenFile)
-		got := tokens.Bytes()
-		if !bytes.Equal(want, got) {
-			t.Errorf("Expected:\n%s\nGot:\n%s", want, got)
+			t.Run(dir+file.Name(), func(t *testing.T) {
+				lexer, cleanup := NewLexer(dir + file.Name())
+				defer cleanup()
+				tokens := bytes.NewBuffer(make([]byte, 0, 4096))
+				for lexer.NextToken() != "" {
+					_, err := tokens.WriteString(lexer.Token() + "\n")
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				gold := goldenFilePath(dir, file.Name())
+				if *update {
+					ioutil.WriteFile(gold, tokens.Bytes(), 0644)
+					return
+				}
+				want, err := ioutil.ReadFile(gold)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got := tokens.Bytes()
+				if !bytes.Equal(want, got) {
+					t.Errorf("Expected:\n%s\nGot:\n%s\n", want, got)
+				}
+			})
+
 		}
 	}
+	runTests("tests/valid/")
+	runTests("tests/invalid/")
 }

@@ -20,7 +20,7 @@ type BufLexer struct {
 	token, cache string
 }
 
-func NewLexer(filename string) (l *Lexer, cleanup func()) {
+func NewLexer(filename string) (l Lexer, cleanup func()) {
 	f := os.Stdin
 	cleanup = func() {}
 	if filename != "stdin" {

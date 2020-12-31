@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"flag"
 	"fmt"
@@ -50,3 +51,4 @@ func testOutput(t *testing.T, dir, label string) {
 		})
 	}
 }
+*/

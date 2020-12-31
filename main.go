@@ -15,7 +15,7 @@ var (
 
 func main() {
 	flag.Parse()
-	lexer, cleanup := NewBufLexer(os.Args[len(os.Args)-1])
+	lexer, cleanup := NewLexer(os.Args[len(os.Args)-1])
 	defer cleanup()
 	if *upToLex {
 		for lexer.NextToken() != "" {
