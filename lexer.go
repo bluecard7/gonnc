@@ -5,23 +5,9 @@ import (
 	"io"
 	"log"
 	"os"
-	"sort"
 	"strings"
 	"unicode"
 )
-
-type specialtokens []string
-
-func punctuators() specialtokens {
-	var tokens = []string{"{", "}", "(", ")", ";", "+", "-", "*", "/", "!", "~"}
-	sort.Strings(tokens)
-	return tokens
-}
-
-func (s specialtokens) has(target string) bool {
-	i := sort.SearchStrings(s, target)
-	return i < len(s) && s[i] == target
-}
 
 type Lexer interface {
 	NextToken() string
@@ -31,11 +17,10 @@ type Lexer interface {
 
 type BufLexer struct {
 	bufRdr       *bufio.Reader
-	punctuators  specialtokens
 	token, cache string
 }
 
-func NewBufLexer(filename string) (l *BufLexer, cleanup func()) {
+func NewLexer(filename string) (l *Lexer, cleanup func()) {
 	f := os.Stdin
 	cleanup = func() {}
 	if filename != "stdin" {
@@ -46,10 +31,7 @@ func NewBufLexer(filename string) (l *BufLexer, cleanup func()) {
 		}
 		cleanup = func() { f.Close() }
 	}
-	l = &BufLexer{
-		bufRdr:      bufio.NewReader(f),
-		punctuators: punctuators(),
-	}
+	l = &BufLexer{bufRdr: bufio.NewReader(f)}
 	return l, cleanup
 }
 
@@ -67,9 +49,10 @@ func (l *BufLexer) NextToken() string {
 		return l.cache
 	}
 	var (
-		token strings.Builder
-		r     rune
-		err   error
+		// TODO:: run profiler and see how many allocation + how to reduce
+		sb  strings.Builder
+		r   rune
+		err error
 	)
 	for err == nil {
 		r, _, err = l.bufRdr.ReadRune()
@@ -77,20 +60,31 @@ func (l *BufLexer) NextToken() string {
 			break
 		}
 		if unicode.IsSpace(r) {
-			if token.Len() > 0 {
-				l.token = token.String()
+			if sb.Len() > 0 {
+				l.token = sb.String()
 				return l.token
 			}
-		} else if l.punctuators.has(string(r)) {
+			continue
+		}
+
+		/* How to do !=, ==, <=, <?
+		var buf []byte
+		buf, err = l.bufRdr.Peek(utf8.UTFMax)
+		d, size = utf8.DecodeRune(buf)
+		then check string([]rune{r, d}) == "<=", "!=", etc
+		{
+		*/
+		if unicode.IsPunct(r) || unicode.IsSymbol(r) {
 			l.token = string(r)
-			if token.Len() > 0 {
+			// can I combine these cases? what I'm really checking is if
+			// the token is finished
+			if sb.Len() > 0 {
 				l.bufRdr.UnreadRune()
-				l.token = token.String()
+				l.token = sb.String()
 			}
 			return l.token
-		} else {
-			token.WriteRune(r) // check for errors?
 		}
+		sb.WriteRune(r)
 	}
 	if err != io.EOF {
 		log.Fatal(err)

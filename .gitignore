@@ -1,4 +1,4 @@
-tests/
+tests/stage*
 goncc
 a.s
 out
