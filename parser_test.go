@@ -55,11 +55,6 @@ var (
 )
 
 func TestAST(t *testing.T) {
-	// generates dst to write AST json representation based on name of file being tested
-	jsonFilepath := func(dir, filename string) string {
-		return dir + "golden/" + strings.Replace(filename, ".c", ".ast", 1)
-	}
-	// trying to do something similar for codegen test
 	runTests := func(dir string) {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
@@ -94,4 +89,9 @@ func TestAST(t *testing.T) {
 	}
 	runTests("tests/valid/")
 	runTests("tests/invalid/")
+}
+
+// generates dst to write AST json representation based on name of file being tested
+func jsonFilepath(dir, filename string) string {
+	return dir + "golden/" + strings.Replace(filename, ".c", ".ast", 1)
 }
