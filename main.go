@@ -8,14 +8,16 @@ import (
 )
 
 var (
-	upToLex   = flag.Bool("l", false, "stop after lexing input")
-	upToParse = flag.Bool("p", false, "stop after parsing tokens")
-	printAST  = flag.Bool("ast", false, "print AST")
+	srcFilename = flag.String("src", "", "program file")
+	dstFilename = flag.String("dst", "", "file to write assembly to")
+	upToLex     = flag.Bool("l", false, "stop after lexing input, prints tokens")
+	upToParse   = flag.Bool("p", false, "stop after parsing tokens")
+	printAST    = flag.Bool("ast", false, "print AST")
 )
 
 func main() {
 	flag.Parse()
-	lexer, cleanup := NewLexer(os.Args[len(os.Args)-1])
+	lexer, cleanup := NewLexer(*srcFilename)
 	defer cleanup()
 	if *upToLex {
 		for lexer.NextToken() != "" {
@@ -34,5 +36,13 @@ func main() {
 	if *upToParse {
 		return
 	}
-	Compile(program)
+
+	dst := os.Stdout
+	if *dstFilename != "" {
+		dst, err = os.OpenFile(*dstFilename, os.O_RDWR|os.O_CREATE, 0755)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	Compile(dst, program)
 }

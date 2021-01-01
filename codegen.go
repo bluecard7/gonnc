@@ -2,50 +2,51 @@ package main
 
 import (
 	"fmt"
+	"io"
 )
 
-func Compile(program *ASTNode) {
-	fmt.Println("\t.globl main")
+func Compile(w io.Writer, program *ASTNode) {
+	fmt.Fprintln(w, "\t.globl main")
 	for _, child := range program.Children {
-		astToAsm(child)
+		astToAsm(w, child)
 	}
 }
 
-func astToAsm(node *ASTNode) {
+func astToAsm(w io.Writer, node *ASTNode) {
 	switch node.Kind {
 	case FUNCTION:
 		// til functions are actually implemented
-		fmt.Printf("%s:\n", "main")
+		fmt.Fprintf(w, "%s:\n", "main")
 		for _, child := range node.Children {
-			astToAsm(child)
+			astToAsm(w, child)
 		}
 	case RETURN:
-		astToAsm(node.Children[0])
-		fmt.Println("\tret")
+		astToAsm(w, node.Children[0])
+		fmt.Fprintln(w, "\tret")
 	case NUM:
-		fmt.Printf("\tmov $%d, %%rax\n", node.Value)
+		fmt.Fprintf(w, "\tmov $%d, %%rax\n", node.Value)
 	case MUL:
-		setupBinOp(node)
-		fmt.Println("\timul %rdi, %rax")
+		setupBinOp(w, node)
+		fmt.Fprintf(w, "\timul %%rdi, %%rax\n")
 	case DIV:
-		setupBinOp(node)
-		fmt.Println("\tcqo")
-		fmt.Println("\tidiv %rdi")
+		setupBinOp(w, node)
+		fmt.Fprintf(w, "\tcqo\n")
+		fmt.Fprintf(w, "\tidiv %%rdi\n")
 	case ADD:
-		setupBinOp(node)
-		fmt.Println("\tadd %rdi, %rax")
+		setupBinOp(w, node)
+		fmt.Fprintf(w, "\tadd %%rdi, %%rax\n")
 	case SUB:
-		setupBinOp(node)
-		fmt.Println("\tsub %rdi, %rax")
+		setupBinOp(w, node)
+		fmt.Fprintf(w, "\tsub %%rdi, %%rax\n")
 	case NEG:
-		astToAsm(node.Children[0])
-		fmt.Println("\tneg %rax")
+		astToAsm(w, node.Children[0])
+		fmt.Fprintf(w, "\tneg %%rax\n")
 	}
 }
 
-func setupBinOp(node *ASTNode) {
-	astToAsm(node.Children[1])
-	fmt.Println("\tpush %rax")
-	astToAsm(node.Children[0])
-	fmt.Println("\tpop %rdi")
+func setupBinOp(w io.Writer, node *ASTNode) {
+	astToAsm(w, node.Children[1])
+	fmt.Fprintf(w, "\tpush %%rax\n")
+	astToAsm(w, node.Children[0])
+	fmt.Fprintf(w, "\tpop %%rdi\n")
 }

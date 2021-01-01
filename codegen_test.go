@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -14,16 +15,19 @@ var (
 )
 
 func TestCompile(t *testing.T) {
-	loadAST := func(dir, filename string, program *ASTNode) {
-		b, err := ioutil.ReadFile(jsonFilepath(dir, filename))
+	loadAST := func(dir, filename string) *ASTNode {
+		b, err := ioutil.ReadFile(pathToGoldenfile(dir, filename, ".ast"))
 		if err != nil {
 			t.Fatal(err)
 		}
+		program := new(ASTNode)
 		err = json.Unmarshal(b, program)
 		if err != nil {
 			t.Fatal(err)
 		}
+		return program
 	}
+
 	runTests := func(dir string) {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
@@ -34,20 +38,25 @@ func TestCompile(t *testing.T) {
 				continue
 			}
 			t.Run(dir+file.Name(), func(t *testing.T) {
-				program := new(ASTNode)
-				loadAST(dir, file.Name(), program)
-				fmt.Println(string(program.JSON()))
-				/*
-					//tmpfile, err := ioutil.TempFile("", "*printed")
-					r, w, err := os.Pipe()
-					if err != nil {
-						t.Fatal(err)
-					}
-					os.Stdout = w
-					//defer os.Remove(tmpfile.Name())
-					os.Pipe(tmpfile, os.Stdout,)
-					Compile(program)
-				*/
+				program := loadAST(dir, file.Name())
+				dst := bytes.NewBuffer(make([]byte, 0, 4096))
+				Compile(dst, program)
+				if *viewAsm {
+					fmt.Println(string(dst.Bytes()))
+					return
+				}
+				goldenfilePath := pathToGoldenfile(dir, file.Name(), ".s")
+				if *updateAsm {
+					ioutil.WriteFile(goldenfilePath, dst.Bytes(), 0644)
+					return
+				}
+				want, err := ioutil.ReadFile(goldenfilePath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := dst.Bytes(); !bytes.Equal(want, got) {
+					t.Errorf("Expected:\n%s\nGot\n%s\n", want, got)
+				}
 			})
 		}
 	}

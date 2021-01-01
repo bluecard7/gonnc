@@ -23,7 +23,7 @@ type BufLexer struct {
 func NewLexer(filename string) (l Lexer, cleanup func()) {
 	f := os.Stdin
 	cleanup = func() {}
-	if filename != "stdin" {
+	if filename != "" {
 		var err error
 		f, err = os.Open(filename)
 		if err != nil {
@@ -44,7 +44,7 @@ func (l *BufLexer) Rewind() {
 }
 
 func (l *BufLexer) NextToken() string {
-	if len(l.cache) > 0 {
+	if l.cache != "" {
 		defer func() { l.cache = "" }()
 		return l.cache
 	}

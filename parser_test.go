@@ -72,12 +72,12 @@ func TestAST(t *testing.T) {
 					fmt.Println(string(program.JSON()))
 					return
 				}
-				goldenFile := jsonFilepath(dir, file.Name())
+				goldenfilePath := pathToGoldenfile(dir, file.Name(), ".ast")
 				if *updateAST {
-					ioutil.WriteFile(goldenFile, program.JSON(), 0644)
+					ioutil.WriteFile(goldenfilePath, program.JSON(), 0644)
 					return
 				}
-				want, err := ioutil.ReadFile(goldenFile)
+				want, err := ioutil.ReadFile(goldenfilePath)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -89,9 +89,4 @@ func TestAST(t *testing.T) {
 	}
 	runTests("tests/valid/")
 	runTests("tests/invalid/")
-}
-
-// generates dst to write AST json representation based on name of file being tested
-func jsonFilepath(dir, filename string) string {
-	return dir + "golden/" + strings.Replace(filename, ".c", ".ast", 1)
 }
