@@ -2,6 +2,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -46,9 +49,17 @@ func (l *FakeLexer) NextToken() string {
 	return l.token
 }
 
+var (
+	viewAST   = flag.Bool("v-ast", false, "prints generated AST")
+	updateAST = flag.Bool("u-ast", false, "updates json files containing AST")
+)
+
 func TestAST(t *testing.T) {
-	// read tokens from corresponding */golden/*.lex
-	// trying to do something similar for codegen test - go protobuf?
+	// generates dst to write AST json representation based on name of file being tested
+	jsonFilepath := func(dir, filename string) string {
+		return dir + "golden/" + strings.Replace(filename, ".c", ".ast", 1)
+	}
+	// trying to do something similar for codegen test
 	runTests := func(dir string) {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
@@ -61,8 +72,23 @@ func TestAST(t *testing.T) {
 			t.Run(dir+file.Name(), func(t *testing.T) {
 				lexer, cleanup := fakeLexer(t, dir, file.Name())
 				defer cleanup()
-				//program, err := AST(lexer)
-				_ := lexer
+				program, _ := AST(lexer)
+				if *viewAST {
+					fmt.Println(string(program.JSON()))
+					return
+				}
+				goldenFile := jsonFilepath(dir, file.Name())
+				if *updateAST {
+					ioutil.WriteFile(goldenFile, program.JSON(), 0644)
+					return
+				}
+				want, err := ioutil.ReadFile(goldenFile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := program.JSON(); !bytes.Equal(want, got) {
+					t.Errorf("Expected:\n%s\nGot\n%s\n", want, got)
+				}
 			})
 		}
 	}

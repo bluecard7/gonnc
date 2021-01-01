@@ -69,7 +69,7 @@ func (node *ASTNode) AddChildren(children ...*ASTNode) {
 	node.Children = append(node.Children, children...)
 }
 
-func (node *ASTNode) Json() []byte {
+func (node *ASTNode) JSON() []byte {
 	b, err := json.Marshal(node)
 	if err != nil {
 		panic(err)
