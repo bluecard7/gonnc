@@ -49,7 +49,6 @@ func (l *FakeLexer) NextToken() string {
 func TestAST(t *testing.T) {
 	// read tokens from corresponding */golden/*.lex
 	// trying to do something similar for codegen test - go protobuf?
-
 	runTests := func(dir string) {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
@@ -63,11 +62,10 @@ func TestAST(t *testing.T) {
 				lexer, cleanup := fakeLexer(t, dir, file.Name())
 				defer cleanup()
 				//program, err := AST(lexer)
-				_ = lexer
+				_ := lexer
 			})
 		}
 	}
-
 	runTests("tests/valid/")
 	runTests("tests/invalid/")
 }

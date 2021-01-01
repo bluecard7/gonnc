@@ -28,7 +28,8 @@ func main() {
 		log.Fatal(err)
 	}
 	if *upToParse || *printAST {
-		program.Print(0)
+		b := program.Json()
+		fmt.Println(string(b))
 	}
 	if *upToParse {
 		return
