@@ -7,17 +7,19 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
 	"testing"
 )
 
+// FakeLexer implements Lexer interface.
+// Uses .lex files (generated from lexer_test.go) as token source.
+// Tokens are already lexed, so this object just reads token as a line.
 type FakeLexer struct {
 	token, cache string
 	scanner      *bufio.Scanner
 }
 
 func fakeLexer(t *testing.T, dir, filename string) (l Lexer, cleanup func()) {
-	tokenSrc := dir + "golden/" + strings.Replace(filename, ".c", ".lex", 1)
+	tokenSrc := pathToGoldenfile(dir, filename, ".lex")
 	f, err := os.Open(tokenSrc)
 	if err != nil {
 		t.Fatal(err)
