@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -40,7 +41,6 @@ func pathToGoldenfile(dir, filename, fileExt string) string {
 }
 
 // just using in lexer test for now
-
 func runTestsOnFiles(t *testing.T, dir string, testrun func(t *testing.T, dir, filename string)) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -60,31 +60,26 @@ func TestNextToken(t *testing.T) {
 	testrun := func(t *testing.T, dir, filename string) {
 		lexer, cleanup := NewLexer(dir + filename)
 		defer cleanup()
-		tokens := bytes.NewBuffer(make([]byte, 0, 4096))
-		goldenfilePath := pathToGoldenfile(dir, filename, ".lex")
-
-		// just revert back to old way, just write all bytes at once
-		var goldenfile *os.File
-		var err error
+		var (
+			goldenfilePath = pathToGoldenfile(dir, filename, ".lex")
+			tokens         io.Writer
+		)
 		if *updateLex {
-			goldenfile, err = os.OpenFile(goldenfilePath, os.O_RDWR|os.O_CREATE, 0755)
+			f, err := os.OpenFile(goldenfilePath, os.O_RDWR|os.O_CREATE, 0755)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer goldenfile.Close()
-		}
+			defer f.Close()
+			tokens = f
+		} else if !*viewLex {
+			tokens = bytes.NewBuffer(make([]byte, 0, 1024))
+		} // otherwise nothing is allocated to tokens -> tokens are printed as lexed, and test ends
 		for lexer.NextToken() != "" {
 			if *viewLex {
 				fmt.Println(lexer.Token())
 				continue
 			}
-			// could combine tokens and goldenFile to a io.Writer...
-			if *updateLex {
-				goldenfile.WriteString(lexer.Token() + "\n")
-				continue
-			}
-			_, err := tokens.WriteString(lexer.Token() + "\n")
-			if err != nil {
+			if _, err := tokens.Write([]byte(lexer.Token() + "\n")); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -95,65 +90,10 @@ func TestNextToken(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := tokens.Bytes(); !bytes.Equal(want, got) {
+		if got := tokens.(*bytes.Buffer).Bytes(); !bytes.Equal(want, got) {
 			t.Errorf("Expected:\n%s\nGot:\n%s\n", want, got)
 		}
 	}
 	runTestsOnFiles(t, "tests/valid/", testrun)
 	runTestsOnFiles(t, "tests/invalid/", testrun)
-	/*
-		runTests := func(dir string) {
-			files, err := ioutil.ReadDir(dir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, file := range files {
-				if file.IsDir() {
-					continue
-				}
-				t.Run(dir+file.Name(), func(t *testing.T) {
-					lexer, cleanup := NewLexer(dir + file.Name())
-					defer cleanup()
-					tokens := bytes.NewBuffer(make([]byte, 0, 4096))
-					goldenfilePath := pathToGoldenfile(dir, file.Name(), ".lex")
-
-					var goldenfile *os.File
-					if *updateLex {
-						goldenfile, err = os.OpenFile(goldenfilePath, os.O_RDWR|os.O_CREATE, 0755)
-						if err != nil {
-							t.Fatal(err)
-						}
-					}
-					for lexer.NextToken() != "" {
-						if *viewLex {
-							fmt.Println(lexer.Token())
-							continue
-						}
-						// could combine tokens and goldenFile to a io.Writer...
-						if *updateLex {
-							goldenfile.WriteString(lexer.Token() + "\n")
-							continue
-						}
-						_, err := tokens.WriteString(lexer.Token() + "\n")
-						if err != nil {
-							t.Fatal(err)
-						}
-					}
-					if *viewLex || *updateLex {
-						return
-					}
-					want, err := ioutil.ReadFile(goldenfilePath)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if got := tokens.Bytes(); !bytes.Equal(want, got) {
-						t.Errorf("Expected:\n%s\nGot:\n%s\n", want, got)
-					}
-				})
-
-			}
-		}
-		runTests("tests/valid/")
-		runTests("tests/invalid/")
-	*/
 }
